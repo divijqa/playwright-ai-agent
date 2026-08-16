@@ -63,6 +63,31 @@ Browser (instrumented)
 
 v2 moves more capability closer to the browser (MCP-enabled browser agent) so that specialized browser-side tools can react faster, capture richer traces, and run lightweight validation/repair logic without round-tripping every decision to the central LLM. This hybrid approach reduces latency, improves signal fidelity (DOM hooks, traces), and lets the browser agent handle fast retries and sanity checks while delegating complex reasoning to the central LLM.
 
+### Visual diagrams (Mermaid)
+
+The diagrams below render the same v1/v2 flows as above — they can be viewed on GitHub's Markdown renderer that supports Mermaid diagrams.
+
+```mermaid
+flowchart LR
+  subgraph v1["Architecture v1"]
+    A[Ollama] --> B[LangChain Agent]
+    B --> C[MCP Client]
+    C --> D[MCP Playwright Tools]
+    D --> E[Browser]
+  end
+```
+
+```mermaid
+flowchart LR
+  subgraph v2["Architecture v2 — MCP-enabled Browser Agent"]
+    A[Ollama (Local LLM)] --> B[LangChain Agent (decision & orchestration)]
+    B --> C[MCP Client / Agent Bridge]
+    C --> D[MCP-enabled Browser Agent (near/inside browser runtime)]
+    D --> E[Playwright Tools (with MCP hooks)]
+    E --> F[Browser (instrumented)]
+  end
+```
+
 ## Version breakdown — AI-assisted Playwright automation
 
 - v1
