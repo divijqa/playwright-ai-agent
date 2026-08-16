@@ -13,6 +13,106 @@ An enterprise-ready architectural sample demonstrating how to integrate **Playwr
 * **LLM Engine:** Ollama (`qwen2.5-coder:7b`)
 * **Language:** TypeScript / Node.js
 
+## Architecture
+Below are two architecture views (v1 and v2) and a brief explanation of the agent flow and version breakdowns.
+
+### Quick pipeline (high-level)
+```
+Ollama
+  ↓
+LangChain Agent
+  ↓
+MCP Client
+  ↓
+MCP Playwright Tools
+  ↓
+Browser
+```
+
+### Architecture (v1)
+
+```
+Ollama
+  ↓
+LangChain Agent
+  ↓
+MCP Client
+  ↓
+MCP Playwright Tools
+  ↓
+Browser
+```
+
+This repository originally implements the v1 architecture focused on AI-assisted Playwright automation with a locally-hosted LLM (Ollama) driving decisions via LangChain and Playwright acting on the browser. The v1 layout keeps most intelligence centralized in the LangChain agent and performs locator analysis, validation, and retries in the test runner process.
+
+### Architecture (v2) — MCP-enabled Browser Agent
+
+```
+Ollama (Local LLM)
+  ↓
+LangChain Agent (decision & orchestration)
+  ↓
+MCP Client / Agent Bridge
+  ↓
+MCP-enabled Browser Agent (runs near/inside browser runtime)
+  ↓
+Playwright Tools (enhanced with MCP hooks)
+  ↓
+Browser (instrumented)
+```
+
+v2 moves more capability closer to the browser (MCP-enabled browser agent) so that specialized browser-side tools can react faster, capture richer traces, and run lightweight validation/repair logic without round-tripping every decision to the central LLM. This hybrid approach reduces latency, improves signal fidelity (DOM hooks, traces), and lets the browser agent handle fast retries and sanity checks while delegating complex reasoning to the central LLM.
+
+## Version breakdown — AI-assisted Playwright automation
+
+- v1
+  - TypeScript
+  - Playwright
+  - Page Object Model
+  - Data-driven tests
+  - Ollama (local LLM)
+  - LangChain
+  - Jenkins (CI integration)
+  - Local LLM and V1.5 AI-assisted locator intelligence
+    - DOM extraction
+    - Locator identification
+    - Structured LLM output
+    - Locator validation
+    - Failure analysis
+
+- v2
+  - MCP-enabled browser agent
+  - Moves validation and quick-retry/repair logic closer to the browser
+  - Improves signal fidelity with richer traces, DOM hooks, and lower-latency checks
+  - Enables hybrid execution: some decisions locally in browser agent, heavier reasoning in central LLM
+  - Faster candidate validation and safer, targeted retries
+
+- v3 (planned / aspirational)
+  - AI-assisted self-healing tests
+  - Continuous learning of locator patterns and robustness metrics
+  - Automated test repair suggestions and safe push-to-suite workflows
+
+## Failure handling & retry flow (v1 → v2 evolution)
+The typical failure and self-healing flow looks like:
+
+```
+Failure
+ ↓
+DOM / Trace / Screenshot (collected)
+ ↓
+LLM (analysis)
+ ↓
+Candidate locator(s) (from structured LLM output)
+ ↓
+Validation (run candidate(s) against current DOM / browser)
+ ↓
+Retry (with validated locator)
+ ↓
+Report (outcome, metrics, artifacts)
+```
+
+In v2 the "Validation" and some "Candidate locator" heuristics can run inside the MCP-enabled browser agent or as a hybrid step to reduce latency and improve repair success rates.
+
 ## 💻 Local Setup & Execution
 
 ### 1. Download Ollama
@@ -24,7 +124,7 @@ ollama run qwen2.5-coder:7b
 ### 2. Run the Project
 ```bash
 # Clone the repository
-git clone https://github.com
+git clone https://github.com/divijqa/playwright-ai-agent
 cd playwright-ai-agent
 
 # Install dependencies
@@ -63,28 +163,3 @@ pipeline {
     }
 }
 ```
-## Architecture V1
-
-                    ┌──────────────────┐
-                    │     Ollama       │
-                    │ qwen2.5-coder:7b │
-                    └────────┬─────────┘
-                             │
-                        LangChain
-                             │
-                    AI Element Mapping
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────┐
-│                  Test Automation Layer              │
-│                                                     │
-│  Tests → Page Objects → Components → Playwright     │
-│           ↑                    ↑                    │
-│           │                    │                    │
-│       Test Data             Locators                │
-└─────────────────────────┬───────────────────────────┘
-                          │
-                       Browser
-                          │
-                       Jenkins
-
