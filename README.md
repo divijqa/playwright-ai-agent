@@ -63,3 +63,28 @@ pipeline {
     }
 }
 ```
+## Architecture V1
+
+                    ┌──────────────────┐
+                    │     Ollama       │
+                    │ qwen2.5-coder:7b │
+                    └────────┬─────────┘
+                             │
+                        LangChain
+                             │
+                    AI Element Mapping
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────┐
+│                  Test Automation Layer              │
+│                                                     │
+│  Tests → Page Objects → Components → Playwright     │
+│           ↑                    ↑                    │
+│           │                    │                    │
+│       Test Data             Locators                │
+└─────────────────────────┬───────────────────────────┘
+                          │
+                       Browser
+                          │
+                       Jenkins
+
