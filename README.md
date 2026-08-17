@@ -43,7 +43,7 @@ MCP Playwright Tools
 Browser
 ```
 
-This repository originally implements the v1 architecture focused on AI-assisted Playwright automation with a locally-hosted LLM (Ollama) driving decisions via LangChain and Playwright acting on the b[...]
+This repository originally implements the v1 architecture focused on AI-assisted Playwright automation with a locally-hosted LLM (Ollama) driving decisions via LangChain and Playwright acting on the browser.
 
 ### Architecture (v2) — MCP-enabled Browser Agent
 
@@ -61,7 +61,7 @@ Playwright Tools (enhanced with MCP hooks)
 Browser (instrumented)
 ```
 
-v2 moves more capability closer to the browser (MCP-enabled browser agent) so that specialized browser-side tools can react faster, capture richer traces, and run lightweight validation/repair logic w[...]
+v2 moves more capability closer to the browser (MCP-enabled browser agent) so that specialized browser-side tools can react faster, capture richer traces, and run lightweight validation/repair logic with lower latency.
 
 ### Visual diagrams (Mermaid)
 
@@ -88,36 +88,66 @@ flowchart LR
   end
 ```
 
-## Version breakdown — AI-assisted Playwright automation
+## Version Breakdown
 
-- v1
-  - TypeScript
-  - Playwright
-  - Page Object Model
-  - Data-driven tests
-  - Ollama (local LLM)
-  - LangChain
-  - Jenkins (CI integration)
-  - Local LLM and V1.5 AI-assisted locator intelligence
-    - DOM extraction
-    - Locator identification
-    - Structured LLM output
-    - Locator validation
-    - Failure analysis
+### V1 — Current Project: AI-assisted Playwright Automation
 
-- v2
-  - MCP-enabled browser agent
-  - Moves validation and quick-retry/repair logic closer to the browser
-  - Improves signal fidelity with richer traces, DOM hooks, and lower-latency checks
-  - Enables hybrid execution: some decisions locally in browser agent, heavier reasoning in central LLM
-  - Faster candidate validation and safer, targeted retries
+**Core Features:**
+- TypeScript
+- Playwright
+- Page Object Model
+- Data-driven tests
+- Ollama (local LLM)
+- LangChain
+- Jenkins (CI integration)
 
-- v3 (planned / aspirational)
-  - AI-assisted self-healing tests
-  - Continuous learning of locator patterns and robustness metrics
-  - Automated test repair suggestions and safe push-to-suite workflows
+**Capabilities:**
+- Basic autonomous web automation
+- LLM-driven navigation and decision-making
+- Playwright browser control
+- CI/CD integration via Jenkins
 
-## Failure handling & retry flow (v1 → v2 evolution)
+---
+
+### V1.5 — AI-assisted Locator Intelligence
+
+**Enhanced Capabilities:**
+- DOM extraction
+- Locator identification
+- Structured LLM output
+- Locator validation
+- Failure analysis
+
+**Improvements over V1:**
+- Intelligent element locator detection using LLM analysis
+- Dynamic locator validation against current DOM state
+- Failure recovery through AI-assisted locator correction
+- Structured output for improved reliability
+
+---
+
+### V2 — MCP-enabled Browser Agent *(Coming Soon)*
+
+**Enhanced Capabilities:**
+- MCP-enabled browser agent
+- Moves validation and quick-retry/repair logic closer to the browser
+- Improves signal fidelity with richer traces, DOM hooks, and lower-latency checks
+- Enables hybrid execution: some decisions locally in browser agent, heavier reasoning in central LLM
+- Faster candidate validation and safer, targeted retries
+
+---
+
+### V3 — AI-assisted Self-Healing Tests *(Planned/Aspirational)*
+
+**Future Enhancements:**
+- AI-assisted self-healing tests
+- Continuous learning of locator patterns and robustness metrics
+- Automated test repair suggestions and safe push-to-suite workflows
+
+---
+
+## Failure Handling & Retry Flow (V1 → V2 Evolution)
+
 The typical failure and self-healing flow looks like:
 
 ```
