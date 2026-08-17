@@ -1,0 +1,14 @@
+{
+  "localhost": {
+    "originInputSelector": "input[placeholder='From']",
+    "destinationInputSelector": "input[placeholder='To']"
+  },
+  "www.aa.com": {
+    "originInputSelector": "input[placeholder='From']",
+    "destinationInputSelector": "input[placeholder='To']"
+  },
+  "": {
+    "originInputSelector": "input[placeholder='From']",
+    "destinationInputSelector": "input[placeholder='To']"
+  }
+}

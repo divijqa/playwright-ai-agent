@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Test Flight Form</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2rem; }
+    .form { max-width: 800px; margin: 0 auto; }
+    input { padding: .5rem; width: 100%; margin-bottom: .5rem; }
+    button { padding: .6rem 1rem; }
+  </style>
+</head>
+<body>
+  <div class="form">
+    <h1>Flight Status (Test Page)</h1>
+    <label for="flightStatusForm-origin">From</label>
+    <input id="flightStatusForm-origin" name="origin" placeholder="From" aria-label="From city or airport" />
+
+    <label for="flightStatusForm-destination">To</label>
+    <input id="flightStatusForm-destination" name="destination" placeholder="To" aria-label="To city or airport" />
+
+    <label for="flightStatusForm-flightNumber">Flight number (optional)</label>
+    <input id="flightStatusForm-flightNumber" name="flightNumber" placeholder="Flight Number" aria-label="Flight number" />
+
+    <button id="searchBtn" type="button">Search</button>
+  </div>
+
+  <script>
+    document.getElementById('searchBtn').addEventListener('click', () => {
+      const origin = document.getElementById('flightStatusForm-origin').value;
+      const dest = document.getElementById('flightStatusForm-destination').value;
+      alert('Search requested: ' + origin + ' → ' + dest);
+    });
+  </script>
+</body>
+</html>
