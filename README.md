@@ -43,7 +43,7 @@ MCP Playwright Tools
 Browser
 ```
 
-This repository originally implements the v1 architecture focused on AI-assisted Playwright automation with a locally-hosted LLM (Ollama) driving decisions via LangChain and Playwright acting on the browser.
+This repository originally implements the v1 architecture focused on AI-assisted Playwright automation with a locally-hosted LLM (Ollama) driving decisions via LangChain and Playwright acting on t[...]
 
 ### Architecture (v2) — MCP-enabled Browser Agent
 
@@ -61,7 +61,7 @@ Playwright Tools (enhanced with MCP hooks)
 Browser (instrumented)
 ```
 
-v2 moves more capability closer to the browser (MCP-enabled browser agent) so that specialized browser-side tools can react faster, capture richer traces, and run lightweight validation/repair logic with lower latency.
+v2 moves more capability closer to the browser (MCP-enabled browser agent) so that specialized browser-side tools can react faster, capture richer traces, and run lightweight validation/repair log[...]
 
 ### Visual diagrams (Mermaid)
 
@@ -217,4 +217,45 @@ pipeline {
         }
     }
 }
+```
+
+## Project structure (v1)
+
+```
+playwright-ai-agent/
+│
+├── src/
+│   ├── agent/
+│   │   ├── aiAgent.ts
+│   │   ├── prompts.ts
+│   │   └── schemas.ts
+│   │
+│   ├── pages/
+│   │   ├── BasePage.ts
+│   │   └── FlightStatusPage.ts
+│   │
+│   ├── data/
+│   │   └── flightData.ts
+│   │
+│   ├── config/
+│   │   └── environment.ts
+│   │
+│   ├── fixtures/
+│   │   └── testFixtures.ts
+│   │
+│   ├── utils/
+│   │   ├── logger.ts
+│   │   └── browser.ts
+│   │
+│   └── types/
+│       └── flight.ts
+│
+├── tests/
+│   └── flightStatus.spec.ts
+│
+├── Jenkinsfile
+├── package.json
+├── playwright.config.ts
+├── tsconfig.json
+└── README.md
 ```
