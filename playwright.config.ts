@@ -17,6 +17,8 @@ const webServer = shouldStartServer
 
 const baseConfig = {
   testDir: './tests',
+  // flightStatus.spec.ts is a standalone agent runner; it is invoked by the shell helper.
+  testIgnore: ['**/flightStatus.spec.ts'],
 
   fullyParallel: true,
 
@@ -41,9 +43,15 @@ const baseConfig = {
     ],
   ],
 
+  outputDir: 'test-results',
+
   use: {
-    // If BASE_URL is a file:// URL we don't set baseURL so tests can navigate directly.
-    baseURL: baseUrlFromEnv && !baseUrlFromEnv.startsWith('file:') ? baseUrlFromEnv : undefined,
+    // Use the configured target, or the local test server for relative fixture URLs.
+    baseURL: baseUrlFromEnv && !baseUrlFromEnv.startsWith('file:')
+      ? baseUrlFromEnv
+      : shouldStartServer
+        ? `http://127.0.0.1:${testServerPort}`
+        : undefined,
 
     headless: process.env.HEADLESS !== 'false',
 

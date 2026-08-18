@@ -270,6 +270,11 @@ The project includes test scripts that support both **local file** and **HTTP se
 ./scripts/run-tests.sh server
 ```
 
+**Run all data-driven scenarios and the agent flow:**
+```bash
+./scripts/run-tests.sh all
+```
+
 When aa.com returns an Access Denied response, server mode does not bypass the
 site's security controls. It records the blocked response and, because the
 runner explicitly enables `ALLOW_LOCAL_FALLBACK`, reruns the same Playwright
@@ -286,9 +291,43 @@ ALLOW_LOCAL_FALLBACK=false npx tsx tests/flightStatus.spec.ts
 # Run Playwright test suite
 npm test
 
+# Run all positive and negative flight data cases
+npm run test:data
+
 # Start static test server on port 8081
 npm run serve-test
 ```
+
+### Failure artifacts demonstration
+
+The project includes an opt-in deliberately failing Playwright test. It proves
+that a failed test produces the same evidence Jenkins archives:
+
+```bash
+npm run test:artifacts
+```
+
+This command is expected to exit with code `1`. It generates:
+
+- Screenshot: `test-results/**/test-failed-1.png`
+- Video: `test-results/**/video.webm`
+- Trace: `test-results/**/trace.zip`
+- HTML report: `playwright-report/index.html`
+
+Open the trace locally with:
+
+```bash
+npx playwright show-trace test-results/<test-directory>/trace.zip
+```
+
+The regular `npm test` and Jenkins test stage do not enable this deliberate
+failure, so normal validation remains green. Jenkins archives `test-results`,
+`playwright-report`, and `screenshots` in its `post` block for review.
+
+The data-driven suite treats negative cases as expected behavior: validation
+errors and no-results responses must pass their assertions. Use
+`npm run test:artifacts` separately when you need an intentionally failing test
+to demonstrate diagnostic capture.
 
 ### 5. Run the Agent
 

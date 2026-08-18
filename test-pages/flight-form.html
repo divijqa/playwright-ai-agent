@@ -24,6 +24,7 @@
     <input id="flightStatusForm-flightNumber" name="flightNumber" placeholder="Flight Number" aria-label="Flight number" />
 
     <button id="searchBtn" type="button">Search</button>
+    <p id="searchError" role="alert" hidden></p>
     <main id="searchResults" hidden>
       <h2>Flight search results</h2>
       <p id="resultsMessage"></p>
@@ -34,8 +35,29 @@
     document.getElementById('searchBtn').addEventListener('click', () => {
       const origin = document.getElementById('flightStatusForm-origin').value;
       const dest = document.getElementById('flightStatusForm-destination').value;
-      document.getElementById('resultsMessage').textContent = 'Flight search results: ' + origin + ' to ' + dest;
-      document.getElementById('searchResults').hidden = false;
+      const flightNumber = document.getElementById('flightStatusForm-flightNumber').value;
+      const error = document.getElementById('searchError');
+      const results = document.getElementById('searchResults');
+      const message = document.getElementById('resultsMessage');
+      const validCodes = /^(DFW|LAX|JFK|ORD|ATL|SFO)$/;
+
+      error.hidden = true;
+      results.hidden = true;
+
+      if (!validCodes.test(origin) || !validCodes.test(dest) || origin === dest) {
+        error.textContent = 'Please enter valid airport codes';
+        error.hidden = false;
+        return;
+      }
+
+      if (flightNumber && !/^[A-Z]{2}\d{1,4}$/.test(flightNumber)) {
+        error.textContent = 'No flights found';
+        error.hidden = false;
+        return;
+      }
+
+      message.textContent = 'Flight search results: ' + origin + ' to ' + dest;
+      results.hidden = false;
     });
   </script>
 </body>

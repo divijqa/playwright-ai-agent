@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "npm run playwright:test",
+    "test:data": "npx playwright test tests/flightSearchData.spec.ts",
     "playwright:test": "npx playwright test",
+    "test:artifacts": "DEMO_FAILURE_ARTIFACTS=true npx playwright test tests/failure-artifacts.spec.ts",
     "serve-test": "sh -c \"npx http-server test-pages -p ${TEST_SERVER_PORT:-8081}\"",
     "typecheck": "tsc --noEmit",
     "start:agent": "npx tsx agent.ts"
