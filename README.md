@@ -528,11 +528,26 @@ playwright-ai-agent/
 │       └── flight.ts
 │
 ├── tests/
+│   ├── ai-schema.spec.ts
+│   ├── ai-vs-static.spec.ts
+│   ├── failure-artifacts.spec.ts
+│   ├── flightSearchData.spec.ts
 │   └── flightStatus.spec.ts
 │
+├── test-pages/
+│   └── flight-form.html
+│
+├── scripts/
+│   └── run-tests.sh
+│
+├── mappings.json
+├── .env.example
+├── .ollama-setup.md
 ├── Jenkinsfile
+├── package-lock.json
 ├── package.json
 ├── playwright.config.ts
 ├── tsconfig.json
+├── agent.ts
 └── README.md
 ```
