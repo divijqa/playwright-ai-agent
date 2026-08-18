@@ -1,8 +1,8 @@
 import { chromium } from 'playwright';
 import { ChatOllama } from '@langchain/ollama';
 import { logger } from '../utils/logger.js';
-import type { FlightFieldMapping } from '../types/flight.js';
-import { isFlightFieldMapping } from '../types/flight.js';
+import type { FlightFieldDecision, FlightFieldMapping } from '../types/flight.js';
+import { isFlightFieldDecision } from '../types/flight.js';
 import { canonicalizeUrl } from '../utils/url.js';
 import { loadMapping, saveMapping } from './mappingStore.js';
 import { getPrompt } from './prompts.js';
@@ -58,9 +58,9 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   }
 
   const cleanInputs = [
-    { id: 'flightStatusForm.origin', name: 'originAirport', placeholder: 'From' },
-    { id: 'flightStatusForm.destination', name: 'destinationAirport', placeholder: 'To' },
-    { id: 'flightStatusForm.flightNumber', name: 'flightNumber', placeholder: 'Flight Number (Optional)' }
+    { tag: 'input', id: 'flightStatusForm.origin', name: 'originAirport', placeholder: 'From', label: 'Departure Airport' },
+    { tag: 'input', id: 'flightStatusForm.destination', name: 'destinationAirport', placeholder: 'To', label: 'Arrival Airport' },
+    { tag: 'input', id: 'flightStatusForm.flightNumber', name: 'flightNumber', placeholder: 'Flight Number', label: 'Flight Number (Optional)' }
   ];
 
   // Extract actual form inputs from the page DOM
@@ -75,12 +75,18 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
     allInputs.forEach((el: any) => {
       const input = el as any;
       inputs.push({
+        tag: input.tagName.toLowerCase(),
         id: input.id || '',
         name: input.name || '',
         placeholder: input.placeholder || '',
         type: input.type || 'text',
         ariaLabel: input.getAttribute('aria-label') || '',
-        ariaPlaceholder: input.getAttribute('aria-placeholder') || ''
+        ariaPlaceholder: input.getAttribute('aria-placeholder') || '',
+        label: (() => {
+          // @ts-ignore - this callback executes in the browser context.
+          const label = input.id ? document.querySelector(`label[for="${input.id}"]`) : null;
+          return label?.textContent?.trim() || input.getAttribute('aria-label') || '';
+        })(),
       });
     });
     return inputs;
@@ -107,10 +113,14 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   const parsed = JSON.parse(cleanJson);
 
   let mapping: FlightFieldMapping | null = null;
-  if (isFlightFieldMapping(parsed)) {
+  let decision: FlightFieldDecision | null = null;
+  if (isFlightFieldDecision(parsed)) {
+    decision = parsed;
     mapping = parsed;
+    logger.info(`🤖 AI decision: required=${decision.requiredFields.join(', ')}, optional=${decision.optionalFields.join(', ')}`);
+    logger.info(`🤖 AI reasoning: ${decision.reasoning}`);
   } else {
-    logger.warn('LLM returned unexpected mapping, falling back to heuristic selectors.');
+    logger.warn('LLM returned an incomplete field decision, falling back to heuristic selectors.');
   }
 
   if (mapping) logger.info(`🎯 Mapping -> origin: ${mapping.originInputSelector} destination: ${mapping.destinationInputSelector}`);
@@ -173,6 +183,10 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
 
   if (!originSelector || !destSelector) {
     throw new Error('Unable to identify both origin and destination inputs.');
+  }
+
+  if (decision && (!decision.requiredFields.includes('origin') || !decision.requiredFields.includes('destination'))) {
+    throw new Error('AI field decision did not classify origin and destination as required fields.');
   }
 
   const pageModel = new FlightStatusPage(page, originSelector, destSelector);

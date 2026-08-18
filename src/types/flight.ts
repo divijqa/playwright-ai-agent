@@ -14,6 +14,14 @@ export interface FlightFieldMapping {
   destinationInputSelector: string;
 }
 
+export type FlightFieldRole = 'origin' | 'destination' | 'flightNumber';
+
+export interface FlightFieldDecision extends FlightFieldMapping {
+  requiredFields: FlightFieldRole[];
+  optionalFields: FlightFieldRole[];
+  reasoning: string;
+}
+
 /** Runtime type guard to validate parsed LLM output before use */
 export function isFlightFieldMapping(obj: unknown): obj is FlightFieldMapping {
   return (
@@ -21,5 +29,14 @@ export function isFlightFieldMapping(obj: unknown): obj is FlightFieldMapping {
     obj !== null &&
     typeof (obj as any).originInputSelector === 'string' &&
     typeof (obj as any).destinationInputSelector === 'string'
+  );
+}
+
+export function isFlightFieldDecision(obj: unknown): obj is FlightFieldDecision {
+  return (
+    isFlightFieldMapping(obj) &&
+    Array.isArray((obj as any).requiredFields) &&
+    Array.isArray((obj as any).optionalFields) &&
+    typeof (obj as any).reasoning === 'string'
   );
 }

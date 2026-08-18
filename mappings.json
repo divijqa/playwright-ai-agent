@@ -9,6 +9,14 @@
   },
   "": {
     "originInputSelector": "#flightStatusForm-origin",
-    "destinationInputSelector": "#flightStatusForm-destination"
+    "destinationInputSelector": "#flightStatusForm-destination",
+    "requiredFields": [
+      "origin",
+      "destination"
+    ],
+    "optionalFields": [
+      "flightNumber"
+    ],
+    "reasoning": "The origin and destination fields have stable IDs that are simple and do not change on each page load. The flight number field is optional based on its placeholder and label."
   }
 }

@@ -104,6 +104,7 @@ flowchart LR
 **Capabilities:**
 - Basic autonomous web automation
 - LLM-driven navigation and decision-making
+- AI classification of required and optional search fields from live page metadata
 - Playwright browser control
 - Reusable page components for airport autocomplete interactions
 - CI/CD integration via Jenkins
@@ -204,6 +205,38 @@ FlightStatusPage
 `AirportSelector` owns airport input behavior, including human-like typing,
 autocomplete suggestion selection, and selected-value access. `FlightStatusPage`
 coordinates those components and owns the Search response assertions.
+
+### Useful AI decision
+
+Before Playwright interacts with the form, the agent extracts a richer page
+representation for each input:
+
+```json
+{
+  "tag": "input",
+  "id": "flightStatusForm.origin",
+  "name": "originAirport",
+  "placeholder": "From",
+  "label": "Departure Airport"
+}
+```
+
+Ollama then decides which fields are required for a route search and returns a
+structured decision containing:
+
+```json
+{
+  "requiredFields": ["origin", "destination"],
+  "optionalFields": ["flightNumber"],
+  "reasoning": "Origin and destination define the route; flight number is optional.",
+  "originInputSelector": "#flightStatusForm-origin",
+  "destinationInputSelector": "#flightStatusForm-destination"
+}
+```
+
+This keeps responsibilities clear: AI identifies and classifies fields,
+Playwright performs the interaction, and Playwright assertions verify the
+application response. The LLM does not decide whether a test passed.
 
 ---
 
