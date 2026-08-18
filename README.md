@@ -272,6 +272,27 @@ reasoning, and rejects unexpected properties. Run the focused schema checks with
 npx playwright test tests/ai-schema.spec.ts
 ```
 
+After validation and locator verification, the agent writes a sanitized audit
+artifact to `test-results/ai-decision.json` before Playwright interacts with
+the form:
+
+```json
+{
+  "model": "qwen2.5-coder:7b",
+  "requiredFields": ["origin", "destination"],
+  "optionalFields": ["flightNumber"],
+  "selectedLocators": {
+    "origin": "#flightStatusForm-origin",
+    "destination": "#flightStatusForm-destination"
+  },
+  "timestamp": "2026-08-18T00:00:00.000Z"
+}
+```
+
+The artifact contains only the model, field decision, validated selectors, and
+timestamp. It does not store raw DOM, entered airport values, page text, or
+other private application data. Jenkins archives `test-results` for review.
+
 ### AI vs static locator comparison
 
 The local demo deliberately uses `From Airport` as the origin label instead of

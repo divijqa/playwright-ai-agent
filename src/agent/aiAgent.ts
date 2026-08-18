@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { ChatOllama } from '@langchain/ollama';
 import { logger } from '../utils/logger.js';
@@ -8,6 +9,23 @@ import { loadMapping, saveMapping } from './mappingStore.js';
 import { getPrompt } from './prompts.js';
 import { environment as env } from '../config/environment.js';
 import { FlightStatusPage } from '../pages/FlightStatusPage.js';
+
+async function writeAiDecisionArtifact(
+  decision: ValidatedFlightFieldDecision,
+  selectedLocators: { origin: string; destination: string },
+) {
+  const artifact = {
+    model: env.ollamaModel,
+    requiredFields: decision.requiredFields,
+    optionalFields: decision.optionalFields,
+    selectedLocators,
+    timestamp: new Date().toISOString(),
+  };
+
+  await mkdir('test-results', { recursive: true });
+  await writeFile('test-results/ai-decision.json', `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+  logger.info('🧾 AI decision artifact saved to test-results/ai-decision.json');
+}
 
 export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true) {
   logger.info('✈️ Initializing Autonomous Agent (modular)...');
@@ -191,6 +209,15 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
 
   if (!decision.requiredFields.includes('origin') || !decision.requiredFields.includes('destination')) {
     throw new Error('AI field decision did not classify origin and destination as required fields.');
+  }
+
+  try {
+    await writeAiDecisionArtifact(decision, {
+      origin: originSelector,
+      destination: destSelector,
+    });
+  } catch (error) {
+    logger.warn('Failed to save AI decision artifact:', error);
   }
 
   const pageModel = new FlightStatusPage(page, originSelector, destSelector);
