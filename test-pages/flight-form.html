@@ -24,13 +24,18 @@
     <input id="flightStatusForm-flightNumber" name="flightNumber" placeholder="Flight Number" aria-label="Flight number" />
 
     <button id="searchBtn" type="button">Search</button>
+    <main id="searchResults" hidden>
+      <h2>Flight search results</h2>
+      <p id="resultsMessage"></p>
+    </main>
   </div>
 
   <script>
     document.getElementById('searchBtn').addEventListener('click', () => {
       const origin = document.getElementById('flightStatusForm-origin').value;
       const dest = document.getElementById('flightStatusForm-destination').value;
-      alert('Search requested: ' + origin + ' → ' + dest);
+      document.getElementById('resultsMessage').textContent = 'Flight search results: ' + origin + ' to ' + dest;
+      document.getElementById('searchResults').hidden = false;
     });
   </script>
 </body>

@@ -19,11 +19,10 @@ case "${1:-}" in
     echo "Starting static server on port ${TEST_SERVER_PORT:-8081} and running tests"
     npx http-server test-pages -p ${TEST_SERVER_PORT:-8081} >/tmp/playwright-test-server.log 2>&1 &
     SERVER_PID=$!
+    trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
     # give server a moment to start
     sleep 1
-    npx tsx tests/flightStatus.spec.ts
-    # stop server
-    kill "$SERVER_PID" || true
+    ALLOW_LOCAL_FALLBACK=true npx tsx tests/flightStatus.spec.ts
     ;;
   *)
     echo "Usage: $0 {local|server}"

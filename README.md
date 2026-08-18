@@ -253,6 +253,17 @@ The project includes test scripts that support both **local file** and **HTTP se
 ./scripts/run-tests.sh server
 ```
 
+When aa.com returns an Access Denied response, server mode does not bypass the
+site's security controls. It records the blocked response and, because the
+runner explicitly enables `ALLOW_LOCAL_FALLBACK`, reruns the same Playwright
+flow against `test-pages/flight-form.html`. This keeps the portfolio demo
+verifiable while reporting the real aa.com network restriction honestly.
+
+To require aa.com and fail instead of using the demo fallback:
+```bash
+ALLOW_LOCAL_FALLBACK=false npx tsx tests/flightStatus.spec.ts
+```
+
 **Or use npm scripts directly:**
 ```bash
 # Run Playwright test suite

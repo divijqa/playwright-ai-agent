@@ -1,9 +1,75 @@
 import { BasePage } from './BasePage.js';
 import type { Page } from 'playwright';
+import { expect } from '@playwright/test';
 
 export class FlightStatusPage extends BasePage {
+  readonly searchButton;
+  readonly resultsSection;
+  readonly resultsMessage;
+
   constructor(page: Page) {
     super(page);
+    this.searchButton = page.getByRole('button', { name: /^Search$/i }).first();
+    this.resultsSection = page.locator('main, [role="main"], body').first();
+    this.resultsMessage = page
+      .getByText(/select flights|search results|flights from|no flights|unable to|error/i)
+      .first();
+  }
+
+  async search() {
+    await expect(this.searchButton).toBeVisible();
+    const initialUrl = this.page.url();
+    await this.searchButton.click();
+
+    // aa.com may navigate or update the current view in place depending on routing state.
+    await this.page.waitForTimeout(1500);
+
+    await expect
+      .poll(
+        async () => {
+          const urlChanged = this.page.url() !== initialUrl;
+          const responseText = await this.page.locator('body').innerText();
+          const hasResponseText = /select flights|search results|flights from|no flights|unable to|error/i.test(
+            responseText,
+          );
+          return urlChanged || hasResponseText;
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(true);
+
+    const accessDenied = this.page.getByText(/access denied|don't have permission|errors\.edgesuite/i).first();
+    if (await accessDenied.count()) {
+      throw new Error(
+        'aa.com blocked the search request with an Access Denied response. ' +
+          'Check Jenkins/network access, proxy, firewall, or aa.com anti-bot restrictions.',
+      );
+    }
+
+    await expect(this.resultsSection).toBeVisible();
+    await expect(this.resultsMessage).toBeVisible();
+  }
+
+  async selectAirportSuggestion(airportCode: string) {
+    const option = this.page
+      .locator('[role="option"]')
+      .filter({ hasText: new RegExp(`\\b${airportCode}\\b`, 'i') })
+      .first();
+
+    if (await option.count()) {
+      await expect(option).toBeVisible();
+      await option.click();
+      return;
+    }
+
+    // The local fixture has no autocomplete list; aa.com does.
+    const suggestion = this.page
+      .getByText(new RegExp(`\\b${airportCode}\\b`, 'i'))
+      .filter({ visible: true })
+      .first();
+    if (await suggestion.count()) {
+      await suggestion.click();
+    }
   }
 
   // humanType expects a CSS selector or id-like string; tries it as-is first, then fallback variants

@@ -6,5 +6,9 @@
   "www.aa.com": {
     "originInputSelector": "#flights-booking-id-1-input",
     "destinationInputSelector": "#flights-booking-id-2-input"
+  },
+  "": {
+    "originInputSelector": "#flightStatusForm-origin",
+    "destinationInputSelector": "#flightStatusForm-destination"
   }
 }

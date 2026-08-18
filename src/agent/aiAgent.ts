@@ -9,7 +9,7 @@ import { getPrompt } from './prompts.js';
 import { environment as env } from '../config/environment.js';
 import { FlightStatusPage } from '../pages/FlightStatusPage.js';
 
-export async function runAgent() {
+export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true) {
   logger.info('✈️ Initializing Autonomous Agent (modular)...');
 
   const browser = await chromium.launch({ headless: env.headless });
@@ -20,12 +20,12 @@ export async function runAgent() {
 
   // Navigate to canonical base URL
   try {
-    const entry = canonicalizeUrl(env.baseUrl);
+    const entry = canonicalizeUrl(targetBaseUrl);
     logger.info(`🔗 Navigating to: ${entry}`);
     await page.goto(entry, { waitUntil: 'domcontentloaded' });
     logger.info('✅ Page navigation successful');
   } catch (e) {
-    logger.warn('❌ Failed to navigate to baseUrl:', env.baseUrl, e);
+    logger.warn('❌ Failed to navigate to baseUrl:', targetBaseUrl, e);
     // Continue anyway - may still work with fallback selectors
   }
   // attempt to dismiss common cookie/privacy modals
@@ -93,7 +93,7 @@ export async function runAgent() {
     logger.info('Page DOM inputs extracted for LLM analysis');
   }
 
-  const domain = (() => { try { return new URL(env.baseUrl).hostname; } catch { return 'unknown'; }})();
+  const domain = (() => { try { return new URL(targetBaseUrl).hostname; } catch { return 'unknown'; }})();
   // check store first
   const existing = await loadMapping(domain);
   if (existing) {
@@ -173,9 +173,47 @@ export async function runAgent() {
     ]);
   }
 
-  if (originSelector) await pageModel.humanType(originSelector, 'DFW');
+  if (originSelector) {
+    await pageModel.humanType(originSelector, 'DFW');
+    await pageModel.selectAirportSuggestion('DFW');
+  }
   await page.waitForTimeout(500);
-  if (destSelector) await pageModel.humanType(destSelector, 'LAX');
+  if (destSelector) {
+    await pageModel.humanType(destSelector, 'LAX');
+    await pageModel.selectAirportSuggestion('LAX');
+  }
+
+  if (!originSelector || !destSelector) {
+    throw new Error('Unable to identify both origin and destination inputs.');
+  }
+
+  const originValue = await page.locator(originSelector).inputValue();
+  const destinationValue = await page.locator(destSelector).inputValue();
+  if (!originValue.startsWith('DFW') || !destinationValue.startsWith('LAX')) {
+    throw new Error(`Flight fields were not filled correctly: ${originValue} -> ${destinationValue}`);
+  }
+
+  // The LLM identifies fields only. Playwright performs Search and verifies the response.
+  try {
+    await pageModel.search();
+    logger.info('✅ Search completed and the target application rendered a response.');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const canFallback =
+      allowFallback &&
+      env.allowLocalFallback &&
+      targetBaseUrl !== env.fallbackBaseUrl &&
+      /Access Denied|anti-bot|blocked the search request/i.test(message);
+
+    if (!canFallback) {
+      throw error;
+    }
+
+    logger.warn(`⚠️ ${message}`);
+    logger.warn(`↪️ Falling back transparently to demo page: ${env.fallbackBaseUrl}`);
+    await browser.close();
+    return runAgent(env.fallbackBaseUrl, false);
+  }
 
   // Capture screenshot to verify what happened
   try {
