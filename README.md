@@ -146,6 +146,50 @@ flowchart LR
 
 ---
 
+## V1 Test Flow: Flight Status Search Automation
+
+The complete v1 workflow demonstrates autonomous web automation with AI-driven field identification and data-driven testing:
+
+```
+Test Data
+  ↓
+AI identifies required fields (DOM extraction & LLM analysis)
+  ↓
+FlightStatusPage (Page Object Model)
+  ↓
+Enter Origin (DFW, LAX, etc.)
+  ↓
+Enter Destination
+  ↓
+Optional Flight Number (if applicable)
+  ↓
+Search
+  ↓
+Validate results (success path)
+  ↓
+Negative/invalid input scenario (error path)
+  ↓
+Validate error message
+  ↓
+Playwright report (HTML, videos, traces, screenshots)
+  ↓
+Jenkins (CI archival and visibility)
+```
+
+**Key stages:**
+1. **Test Data** — Input parameters (origin, destination, flight number)
+2. **AI Field Identification** — LLM analyzes page DOM and identifies input fields dynamically
+3. **Page Object** — `FlightStatusPage` encapsulates Playwright locators and human-like typing
+4. **Form Fill** — Agent enters data using slow, character-by-character typing (mimics human behavior)
+5. **Search** — Submit form and navigate to results
+6. **Validation** — Assert results match expected flights or error states
+7. **Negative Testing** — Retry with invalid inputs (e.g., empty fields, nonsense codes)
+8. **Error Handling** — Validate error messages and recovery
+9. **Reporting** — Playwright captures full traces, videos, screenshots for audit trails
+10. **CI Integration** — Jenkins archives artifacts and publishes HTML reports
+
+---
+
 ## Failure Handling & Retry Flow (V1 → V2 Evolution)
 
 The typical failure and self-healing flow looks like:

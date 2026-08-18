@@ -1,7 +1,11 @@
+export type TestExpectation = 'success' | 'validation-error' | 'no-results';
+
 export interface FlightSearchData {
+  name: string;
   origin: string;
   destination: string;
   flightNumber?: string;
+  expectedResult: TestExpectation;
 }
 
 /** CSS selector or Playwright locator string for an input field on the page */
