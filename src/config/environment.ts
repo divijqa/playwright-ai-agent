@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export type Environment = {
+  aiEnabled: boolean;
   baseUrl: string;
   headless: boolean;
   allowLocalFallback: boolean;
@@ -25,6 +26,7 @@ function parseNumber(value: string | undefined, fallback: number): number {
 }
 
 export const environment: Environment = {
+  aiEnabled: parseBool(process.env.AI_ENABLED, true),
   baseUrl: process.env.BASE_URL ?? 'https://example.com',
   headless: parseBool(process.env.HEADLESS, true),
   allowLocalFallback: parseBool(process.env.ALLOW_LOCAL_FALLBACK, false),

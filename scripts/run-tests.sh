@@ -2,8 +2,9 @@
 set -euo pipefail
 
 # scripts/run-tests.sh
-# Usage: ./scripts/run-tests.sh {local|data|server|all}
+# Usage: ./scripts/run-tests.sh {local|baseline|data|server|all}
 # - local: run the single integration test against the local file:// test page
+# - baseline: run the local integration flow with AI mapping disabled
 # - data: run all positive and negative data-driven Playwright scenarios
 # - server: run the agent against aa.com with explicit local fallback enabled
 # - all: run data-driven scenarios and the agent flow
@@ -16,6 +17,10 @@ case "${1:-}" in
   local)
     echo "Running test against local file URL: $BASE_FILE_URL"
     BASE_URL="$BASE_FILE_URL" npx tsx tests/flightStatus.spec.ts
+    ;;
+  baseline)
+    echo "Running traditional Playwright baseline without Ollama: $BASE_FILE_URL"
+    AI_ENABLED=false BASE_URL="$BASE_FILE_URL" HEADLESS=true npx tsx tests/flightStatus.spec.ts
     ;;
   data)
     echo "Running all positive and negative data-driven scenarios"
@@ -36,8 +41,9 @@ case "${1:-}" in
     "$0" server
     ;;
   *)
-    echo "Usage: $0 {local|data|server|all}"
+    echo "Usage: $0 {local|baseline|data|server|all}"
     echo "  local  - run single test against file:// URL"
+    echo "  baseline - run local test with AI mapping disabled"
     echo "  data   - run all positive and negative data-driven scenarios"
     echo "  server - run agent against aa.com with explicit local fallback"
     echo "  all    - run data-driven scenarios and the agent flow"

@@ -33,6 +33,26 @@ Browser
 Jenkins
 ```
 
+The same agent also supports an explicit traditional Playwright baseline:
+
+```text
+AI_ENABLED=true                 AI_ENABLED=false
+        ↓                              ↓
+Ollama + LangChain              Known FlightStatusPage mapping
+        ↓                              ↓
+AI field mapping                Page Object Model (POM)
+        └──────────────┬───────────────┘
+                       ↓
+                   Playwright
+                       ↓
+                    Browser
+```
+
+`AI_ENABLED=true` is the default and uses live DOM metadata plus Ollama for
+field mapping. `AI_ENABLED=false` skips DOM analysis and Ollama entirely, then
+uses the stable selectors defined by the POM. Both modes share the same browser
+interaction and response verification steps, making the comparison meaningful.
+
 ### Architecture (v1)
 
 ```
@@ -398,6 +418,11 @@ The project includes test scripts that support both **local file** and **HTTP se
 ./scripts/run-tests.sh local
 ```
 
+**Run the traditional Playwright baseline without Ollama:**
+```bash
+./scripts/run-tests.sh baseline
+```
+
 **Test against local HTTP server (simulates CI environment):**
 ```bash
 ./scripts/run-tests.sh server
@@ -469,6 +494,16 @@ to demonstrate diagnostic capture.
 npx tsx agent.ts
 ```
 
+**Run the traditional Playwright baseline without Ollama:**
+```bash
+AI_ENABLED=false BASE_URL="file://$PWD/test-pages/flight-form.html" HEADLESS=true npm run start:agent
+```
+
+**Run the AI-assisted flow:**
+```bash
+AI_ENABLED=true BASE_URL="file://$PWD/test-pages/flight-form.html" HEADLESS=true npm run start:agent
+```
+
 **Run with custom base URL:**
 ```bash
 BASE_URL=https://www.aa.com/en-us/flights npx tsx agent.ts
@@ -499,6 +534,7 @@ To deploy this setup inside your self-hosted Jenkins server:
 
 **Key environment variables set in Jenkins pipeline:**
 - `CI=true` — enables CI mode (1 worker, retries enabled)
+- `AI_ENABLED=true` — enables Ollama-backed field mapping; set to `false` for the POM baseline
 - `HEADLESS=true` — runs browser headless
 - `OLLAMA_MODEL=qwen2.5-coder:7b` — specifies the model
 - `TEST_SERVER_PORT=8081` — avoids port conflicts with Jenkins (port 8080)

@@ -2,6 +2,12 @@ import { BasePage } from './BasePage.js';
 import type { Page } from 'playwright';
 import { expect } from '@playwright/test';
 import { AirportSelector } from './components/AirportSelector.js';
+import type { FlightFieldMapping } from '../types/flight.js';
+
+export const knownFlightFieldMapping: FlightFieldMapping = {
+  originInputSelector: '#flightStatusForm-origin',
+  destinationInputSelector: '#flightStatusForm-destination',
+};
 
 export class FlightStatusPage extends BasePage {
   readonly origin: AirportSelector;
@@ -14,12 +20,12 @@ export class FlightStatusPage extends BasePage {
     super(page);
     this.origin = new AirportSelector(
       page,
-      originSelector ?? '#flights-booking-id-1-input, #flightStatusForm-origin',
+      originSelector ?? knownFlightFieldMapping.originInputSelector,
       'origin',
     );
     this.destination = new AirportSelector(
       page,
-      destinationSelector ?? '#flights-booking-id-2-input, #flightStatusForm-destination',
+      destinationSelector ?? knownFlightFieldMapping.destinationInputSelector,
       'destination',
     );
     this.searchButton = page.getByRole('button', { name: /^Search$/i }).first();

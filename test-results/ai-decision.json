@@ -1,0 +1,15 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "requiredFields": [
+    "origin",
+    "destination"
+  ],
+  "optionalFields": [
+    "flightNumber"
+  ],
+  "selectedLocators": {
+    "origin": "#flightStatusForm-origin",
+    "destination": "#flightStatusForm-destination"
+  },
+  "timestamp": "2026-08-18T07:28:01.321Z"
+}

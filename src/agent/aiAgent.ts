@@ -8,7 +8,7 @@ import { canonicalizeUrl } from '../utils/url.js';
 import { loadMapping, saveMapping } from './mappingStore.js';
 import { getPrompt } from './prompts.js';
 import { environment as env } from '../config/environment.js';
-import { FlightStatusPage } from '../pages/FlightStatusPage.js';
+import { FlightStatusPage, knownFlightFieldMapping } from '../pages/FlightStatusPage.js';
 
 async function writeAiDecisionArtifact(
   decision: ValidatedFlightFieldDecision,
@@ -33,8 +33,6 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   const browser = await chromium.launch({ headless: env.headless });
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await context.newPage();
-
-  const llm = new ChatOllama({ model: env.ollamaModel, temperature: env.ollamaTemperature });
 
   // Navigate to canonical base URL
   try {
@@ -84,7 +82,7 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   // Extract actual form inputs from the page DOM
   // Note: code inside page.evaluate() runs in browser context, so DOM APIs are available
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const extractedInputs = await page.evaluate(() => {
+  const extractedInputs = env.aiEnabled ? await page.evaluate(() => {
     // @ts-ignore - this code runs in browser context where document is available
     const inputs: any[] = [];
     // @ts-ignore
@@ -108,44 +106,55 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
       });
     });
     return inputs;
-  });
+  }) : [];
 
   // Use extracted inputs if available, otherwise fall back to hardcoded schema
   const formInputs = extractedInputs.length > 0 ? extractedInputs : cleanInputs;
-  logger.info(`🖋️ Extracted ${formInputs.length} potential form fields from page DOM.`);
-  if (extractedInputs.length > 0) {
+  logger.info(
+    env.aiEnabled
+      ? `🖋️ Extracted ${formInputs.length} potential form fields from page DOM.`
+      : `🖋️ AI disabled; using ${formInputs.length} fields from the known POM mapping.`,
+  );
+  if (env.aiEnabled && extractedInputs.length > 0) {
     logger.info('Page DOM inputs extracted for LLM analysis');
   }
 
   const domain = (() => { try { return new URL(targetBaseUrl).hostname; } catch { return 'unknown'; }})();
-  // check store first
-  const existing = await loadMapping(domain);
-  if (existing) {
-    logger.info('Using stored mapping for domain:', domain);
-  }
+  let mapping: FlightFieldMapping | null = null;
+  let decision: ValidatedFlightFieldDecision | null = null;
 
-  const prompt = getPrompt(formInputs, domain);
-  logger.info('🧠 Sending prompt to local Ollama...');
-  const response = await llm.invoke(prompt);
-  const cleanJson = response.content.toString().replace(/```json|```/g, '').trim();
-  let decision: ValidatedFlightFieldDecision;
-  try {
-    const parsed: unknown = JSON.parse(cleanJson);
-    const validation = flightFieldDecisionSchema.safeParse(parsed);
-    if (!validation.success) {
-      throw new Error(validation.error.issues.map((issue) => issue.message).join('; '));
+  if (env.aiEnabled) {
+    const existing = await loadMapping(domain);
+    if (existing) {
+      logger.info('Using stored mapping for domain:', domain);
     }
-    decision = validation.data;
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid AI field decision; refusing to interact with the page: ${reason}`);
+
+    const prompt = getPrompt(formInputs, domain);
+    logger.info('🧠 Sending prompt to local Ollama...');
+    const llm = new ChatOllama({ model: env.ollamaModel, temperature: env.ollamaTemperature });
+    const response = await llm.invoke(prompt);
+    const cleanJson = response.content.toString().replace(/```json|```/g, '').trim();
+    try {
+      const parsed: unknown = JSON.parse(cleanJson);
+      const validation = flightFieldDecisionSchema.safeParse(parsed);
+      if (!validation.success) {
+        throw new Error(validation.error.issues.map((issue) => issue.message).join('; '));
+      }
+      decision = validation.data;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid AI field decision; refusing to interact with the page: ${reason}`);
+    }
+
+    mapping = decision;
+    logger.info(`✅ Zod validated AI decision: required=${decision.requiredFields.join(', ')}, optional=${decision.optionalFields.join(', ')}`);
+    logger.info(`🤖 AI reasoning: ${decision.reasoning}`);
+  } else {
+    mapping = knownFlightFieldMapping;
+    logger.info('🚫 AI disabled; using known FlightStatusPage mapping.');
   }
 
-  const mapping: FlightFieldMapping = decision;
-  logger.info(`✅ Zod validated AI decision: required=${decision.requiredFields.join(', ')}, optional=${decision.optionalFields.join(', ')}`);
-  logger.info(`🤖 AI reasoning: ${decision.reasoning}`);
-
-  if (mapping) logger.info(`🎯 Mapping -> origin: ${mapping.originInputSelector} destination: ${mapping.destinationInputSelector}`);
+  logger.info(`🎯 Mapping -> origin: ${mapping.originInputSelector} destination: ${mapping.destinationInputSelector}`);
 
   // Utility: check if a CSS selector actually matches elements on the page
   const selectorExists = async (selector: string): Promise<boolean> => {
@@ -175,14 +184,14 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   if (mapping) {
     if (await selectorExists(mapping.originInputSelector)) {
       originSelector = mapping.originInputSelector;
-      logger.info(`Using stored origin selector: ${originSelector}`);
+      logger.info(`Using mapped origin selector: ${originSelector}`);
     } else {
       logger.warn(`Stored origin selector not found on page: ${mapping.originInputSelector}, falling back to heuristics.`);
     }
 
     if (await selectorExists(mapping.destinationInputSelector)) {
       destSelector = mapping.destinationInputSelector;
-      logger.info(`Using stored destination selector: ${destSelector}`);
+      logger.info(`Using mapped destination selector: ${destSelector}`);
     } else {
       logger.warn(`Stored destination selector not found on page: ${mapping.destinationInputSelector}, falling back to heuristics.`);
     }
@@ -207,17 +216,19 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
     throw new Error('Unable to identify both origin and destination inputs.');
   }
 
-  if (!decision.requiredFields.includes('origin') || !decision.requiredFields.includes('destination')) {
+  if (decision && (!decision.requiredFields.includes('origin') || !decision.requiredFields.includes('destination'))) {
     throw new Error('AI field decision did not classify origin and destination as required fields.');
   }
 
-  try {
-    await writeAiDecisionArtifact(decision, {
-      origin: originSelector,
-      destination: destSelector,
-    });
-  } catch (error) {
-    logger.warn('Failed to save AI decision artifact:', error);
+  if (decision) {
+    try {
+      await writeAiDecisionArtifact(decision, {
+        origin: originSelector,
+        destination: destSelector,
+      });
+    } catch (error) {
+      logger.warn('Failed to save AI decision artifact:', error);
+    }
   }
 
   const pageModel = new FlightStatusPage(page, originSelector, destSelector);
@@ -267,7 +278,7 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   }
 
   // persist mapping if obtained from LLM
-  if (mapping) {
+  if (env.aiEnabled && mapping) {
     try {
       await saveMapping(domain, mapping);
       logger.info('Saved mapping for domain:', domain);
