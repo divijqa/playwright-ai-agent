@@ -105,6 +105,7 @@ flowchart LR
 - Basic autonomous web automation
 - LLM-driven navigation and decision-making
 - Playwright browser control
+- Reusable page components for airport autocomplete interactions
 - CI/CD integration via Jenkins
 
 ---
@@ -187,6 +188,22 @@ Jenkins (CI archival and visibility)
 8. **Error Handling** — Validate error messages and recovery
 9. **Reporting** — Playwright captures full traces, videos, screenshots for audit trails
 10. **CI Integration** — Jenkins archives artifacts and publishes HTML reports
+
+### Reusable page components
+
+The flight page is composed from reusable components rather than keeping every
+interaction in one large page object:
+
+```
+FlightStatusPage
+├── AirportSelector (origin)
+├── AirportSelector (destination)
+└── Search and response assertions
+```
+
+`AirportSelector` owns airport input behavior, including human-like typing,
+autocomplete suggestion selection, and selected-value access. `FlightStatusPage`
+coordinates those components and owns the Search response assertions.
 
 ---
 
@@ -339,7 +356,9 @@ playwright-ai-agent/
 │   │
 │   ├── pages/
 │   │   ├── BasePage.ts
-│   │   └── FlightStatusPage.ts
+│   │   ├── FlightStatusPage.ts
+│   │   └── components/
+│   │       └── AirportSelector.ts
 │   │
 │   ├── data/
 │   │   └── flightData.ts

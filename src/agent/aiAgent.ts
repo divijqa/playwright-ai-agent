@@ -115,8 +115,6 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
 
   if (mapping) logger.info(`🎯 Mapping -> origin: ${mapping.originInputSelector} destination: ${mapping.destinationInputSelector}`);
 
-  const pageModel = new FlightStatusPage(page);
-
   // Utility: check if a CSS selector actually matches elements on the page
   const selectorExists = async (selector: string): Promise<boolean> => {
     try {
@@ -173,22 +171,20 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
     ]);
   }
 
-  if (originSelector) {
-    await pageModel.humanType(originSelector, 'DFW');
-    await pageModel.selectAirportSuggestion('DFW');
-  }
-  await page.waitForTimeout(500);
-  if (destSelector) {
-    await pageModel.humanType(destSelector, 'LAX');
-    await pageModel.selectAirportSuggestion('LAX');
-  }
-
   if (!originSelector || !destSelector) {
     throw new Error('Unable to identify both origin and destination inputs.');
   }
 
-  const originValue = await page.locator(originSelector).inputValue();
-  const destinationValue = await page.locator(destSelector).inputValue();
+  const pageModel = new FlightStatusPage(page, originSelector, destSelector);
+
+  await pageModel.origin.fill('DFW');
+  await pageModel.origin.selectSuggestion('DFW');
+  await page.waitForTimeout(500);
+  await pageModel.destination.fill('LAX');
+  await pageModel.destination.selectSuggestion('LAX');
+
+  const originValue = await pageModel.origin.value();
+  const destinationValue = await pageModel.destination.value();
   if (!originValue.startsWith('DFW') || !destinationValue.startsWith('LAX')) {
     throw new Error(`Flight fields were not filled correctly: ${originValue} -> ${destinationValue}`);
   }
