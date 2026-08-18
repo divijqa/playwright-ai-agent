@@ -1,8 +1,8 @@
 import { chromium } from 'playwright';
 import { ChatOllama } from '@langchain/ollama';
 import { logger } from '../utils/logger.js';
-import type { FlightFieldDecision, FlightFieldMapping } from '../types/flight.js';
-import { isFlightFieldDecision } from '../types/flight.js';
+import type { FlightFieldMapping } from '../types/flight.js';
+import { flightFieldDecisionSchema, type ValidatedFlightFieldDecision } from './schemas.js';
 import { canonicalizeUrl } from '../utils/url.js';
 import { loadMapping, saveMapping } from './mappingStore.js';
 import { getPrompt } from './prompts.js';
@@ -110,18 +110,22 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   logger.info('🧠 Sending prompt to local Ollama...');
   const response = await llm.invoke(prompt);
   const cleanJson = response.content.toString().replace(/```json|```/g, '').trim();
-  const parsed = JSON.parse(cleanJson);
-
-  let mapping: FlightFieldMapping | null = null;
-  let decision: FlightFieldDecision | null = null;
-  if (isFlightFieldDecision(parsed)) {
-    decision = parsed;
-    mapping = parsed;
-    logger.info(`🤖 AI decision: required=${decision.requiredFields.join(', ')}, optional=${decision.optionalFields.join(', ')}`);
-    logger.info(`🤖 AI reasoning: ${decision.reasoning}`);
-  } else {
-    logger.warn('LLM returned an incomplete field decision, falling back to heuristic selectors.');
+  let decision: ValidatedFlightFieldDecision;
+  try {
+    const parsed: unknown = JSON.parse(cleanJson);
+    const validation = flightFieldDecisionSchema.safeParse(parsed);
+    if (!validation.success) {
+      throw new Error(validation.error.issues.map((issue) => issue.message).join('; '));
+    }
+    decision = validation.data;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid AI field decision; refusing to interact with the page: ${reason}`);
   }
+
+  const mapping: FlightFieldMapping = decision;
+  logger.info(`✅ Zod validated AI decision: required=${decision.requiredFields.join(', ')}, optional=${decision.optionalFields.join(', ')}`);
+  logger.info(`🤖 AI reasoning: ${decision.reasoning}`);
 
   if (mapping) logger.info(`🎯 Mapping -> origin: ${mapping.originInputSelector} destination: ${mapping.destinationInputSelector}`);
 
@@ -185,7 +189,7 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
     throw new Error('Unable to identify both origin and destination inputs.');
   }
 
-  if (decision && (!decision.requiredFields.includes('origin') || !decision.requiredFields.includes('destination'))) {
+  if (!decision.requiredFields.includes('origin') || !decision.requiredFields.includes('destination')) {
     throw new Error('AI field decision did not classify origin and destination as required fields.');
   }
 

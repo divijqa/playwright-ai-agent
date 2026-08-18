@@ -249,6 +249,29 @@ This keeps responsibilities clear: AI identifies and classifies fields,
 Playwright performs the interaction, and Playwright assertions verify the
 application response. The LLM does not decide whether a test passed.
 
+### Structured AI output validation
+
+The AI decision is never used directly. The runtime boundary is:
+
+```text
+Ollama
+  ↓
+JSON parsing
+  ↓
+Zod schema validation
+  ↓
+Valid decision?
+  ├── Yes → Playwright field discovery and actions
+  └── No  → fail safely before page interaction
+```
+
+The strict Zod schema validates selectors, required fields, optional fields,
+reasoning, and rejects unexpected properties. Run the focused schema checks with:
+
+```bash
+npx playwright test tests/ai-schema.spec.ts
+```
+
 ### AI vs static locator comparison
 
 The local demo deliberately uses `From Airport` as the origin label instead of
