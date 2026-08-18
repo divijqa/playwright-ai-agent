@@ -20,13 +20,17 @@ Below are two architecture views (v1 and v2) and a brief explanation of the agen
 ```
 Ollama
   ↓
-LangChain Agent
+LangChain
   ↓
-MCP Client
+AI Field Intelligence
   ↓
-MCP Playwright Tools
+Page Object Model (POM)
+  ↓
+Playwright
   ↓
 Browser
+  ↓
+Jenkins
 ```
 
 ### Architecture (v1)
@@ -34,16 +38,20 @@ Browser
 ```
 Ollama
   ↓
-LangChain Agent
+LangChain
   ↓
-MCP Client
+AI Field Intelligence
   ↓
-MCP Playwright Tools
+Page Object Model (POM)
+  ↓
+Playwright
   ↓
 Browser
+  ↓
+Jenkins
 ```
 
-This repository originally implements the v1 architecture focused on AI-assisted Playwright automation with a locally-hosted LLM (Ollama) driving decisions via LangChain and Playwright acting on t[...]
+This repository implements the V1 architecture: Ollama provides local language-model reasoning, LangChain orchestrates the request, AI field intelligence identifies and classifies form fields, the Page Object Model exposes reusable components, Playwright performs browser actions, and Jenkins runs the workflow in CI.
 
 ### Architecture (v2) — MCP-enabled Browser Agent
 
@@ -65,15 +73,17 @@ v2 moves more capability closer to the browser (MCP-enabled browser agent) so th
 
 ### Visual diagrams (Mermaid)
 
-The diagrams below render the same v1/v2 flows as above — they can be viewed on GitHub's Markdown renderer that supports Mermaid diagrams.
+The diagrams below render the V1 flow and the planned V2 flow. They can be viewed on GitHub's Markdown renderer that supports Mermaid diagrams.
 
 ```mermaid
 flowchart LR
   subgraph v1["Architecture v1"]
     A["Ollama"] --> B["LangChain Agent"]
-    B --> C["MCP Client"]
-    C --> D["MCP Playwright Tools"]
-    D --> E["Browser"]
+    B --> C["AI Field Intelligence"]
+    C --> D["Page Object Model"]
+    D --> E["Playwright"]
+    E --> F["Browser"]
+    F --> G["Jenkins"]
   end
 ```
 
@@ -99,11 +109,12 @@ flowchart LR
 - Data-driven tests
 - Ollama (local LLM)
 - LangChain
+- AI field intelligence for required/optional field classification
 - Jenkins (CI integration)
 
 **Capabilities:**
 - Basic autonomous web automation
-- LLM-driven navigation and decision-making
+- LLM-driven field identification and decision-making
 - AI classification of required and optional search fields from live page metadata
 - Playwright browser control
 - Reusable page components for airport autocomplete interactions
