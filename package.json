@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "npm run playwright:test",
+    "test:comparison": "npx playwright test tests/ai-vs-static.spec.ts",
     "test:data": "npx playwright test tests/flightSearchData.spec.ts",
     "playwright:test": "npx playwright test",
     "test:artifacts": "DEMO_FAILURE_ARTIFACTS=true npx playwright test tests/failure-artifacts.spec.ts",

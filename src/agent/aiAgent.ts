@@ -58,7 +58,7 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   }
 
   const cleanInputs = [
-    { tag: 'input', id: 'flightStatusForm.origin', name: 'originAirport', placeholder: 'From', label: 'Departure Airport' },
+    { tag: 'input', id: 'flightStatusForm.origin', name: 'originAirport', placeholder: 'From', label: 'From Airport' },
     { tag: 'input', id: 'flightStatusForm.destination', name: 'destinationAirport', placeholder: 'To', label: 'Arrival Airport' },
     { tag: 'input', id: 'flightStatusForm.flightNumber', name: 'flightNumber', placeholder: 'Flight Number', label: 'Flight Number (Optional)' }
   ];

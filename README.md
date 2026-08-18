@@ -249,6 +249,51 @@ This keeps responsibilities clear: AI identifies and classifies fields,
 Playwright performs the interaction, and Playwright assertions verify the
 application response. The LLM does not decide whether a test passed.
 
+### AI vs static locator comparison
+
+The local demo deliberately uses `From Airport` as the origin label instead of
+the earlier `Departure Airport` label. The traditional locator is tied to the
+old metadata and no longer matches:
+
+```text
+Traditional:
+Departure Airport -> getByLabel('Departure Airport') -> fails after label change
+```
+
+The AI-assisted flow receives the live DOM metadata, reasons from the field's
+label/name/placeholder semantics, returns the origin mapping, validates it with
+Playwright, and fills the field:
+
+```text
+AI-assisted:
+DOM metadata
+  ↓
+Ollama via LangChain
+  ↓
+requiredFields: [origin, destination]
+  ↓
+origin/destination mapping
+  ↓
+validated Playwright action
+```
+
+Run the executable comparison with:
+
+```bash
+npm run test:comparison
+```
+
+The comparison proves that the old static label locator matches zero elements
+while metadata-driven identification still finds and fills `DFW`. The full
+agent flow also sends this representation to Ollama in `runAgent()`.
+
+This metadata change is isolated to the local demo fixture. The aa.com path is
+not dependent on `Departure Airport` or `From Airport`; it extracts aa.com's
+live labels, placeholders, ARIA metadata, and stable input IDs before asking
+Ollama for the field decision. The verified aa.com run still identifies and
+fills `DFW` and `LAX`; an external Access Denied response can still prevent the
+Search request from completing.
+
 ---
 
 ## Failure Handling & Retry Flow (V1 → V2 Evolution)
