@@ -21,9 +21,12 @@ export async function runAgent() {
   // Navigate to canonical base URL
   try {
     const entry = canonicalizeUrl(env.baseUrl);
+    logger.info(`🔗 Navigating to: ${entry}`);
     await page.goto(entry, { waitUntil: 'domcontentloaded' });
+    logger.info('✅ Page navigation successful');
   } catch (e) {
-    logger.warn('Failed to navigate to baseUrl:', env.baseUrl, e);
+    logger.warn('❌ Failed to navigate to baseUrl:', env.baseUrl, e);
+    // Continue anyway - may still work with fallback selectors
   }
   // attempt to dismiss common cookie/privacy modals
   try {
@@ -60,7 +63,35 @@ export async function runAgent() {
     { id: 'flightStatusForm.flightNumber', name: 'flightNumber', placeholder: 'Flight Number (Optional)' }
   ];
 
-  logger.info(`🖋️ Extracted ${cleanInputs.length} potential form fields from schema profile.`);
+  // Extract actual form inputs from the page DOM
+  // Note: code inside page.evaluate() runs in browser context, so DOM APIs are available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const extractedInputs = await page.evaluate(() => {
+    // @ts-ignore - this code runs in browser context where document is available
+    const inputs: any[] = [];
+    // @ts-ignore
+    const allInputs = document.querySelectorAll('input[type="text"], input:not([type])');
+    // @ts-ignore
+    allInputs.forEach((el: any) => {
+      const input = el as any;
+      inputs.push({
+        id: input.id || '',
+        name: input.name || '',
+        placeholder: input.placeholder || '',
+        type: input.type || 'text',
+        ariaLabel: input.getAttribute('aria-label') || '',
+        ariaPlaceholder: input.getAttribute('aria-placeholder') || ''
+      });
+    });
+    return inputs;
+  });
+
+  // Use extracted inputs if available, otherwise fall back to hardcoded schema
+  const formInputs = extractedInputs.length > 0 ? extractedInputs : cleanInputs;
+  logger.info(`🖋️ Extracted ${formInputs.length} potential form fields from page DOM.`);
+  if (extractedInputs.length > 0) {
+    logger.info('Page DOM inputs extracted for LLM analysis');
+  }
 
   const domain = (() => { try { return new URL(env.baseUrl).hostname; } catch { return 'unknown'; }})();
   // check store first
@@ -69,7 +100,7 @@ export async function runAgent() {
     logger.info('Using stored mapping for domain:', domain);
   }
 
-  const prompt = getPrompt(cleanInputs, domain);
+  const prompt = getPrompt(formInputs, domain);
   logger.info('🧠 Sending prompt to local Ollama...');
   const response = await llm.invoke(prompt);
   const cleanJson = response.content.toString().replace(/```json|```/g, '').trim();
@@ -86,30 +117,75 @@ export async function runAgent() {
 
   const pageModel = new FlightStatusPage(page);
 
+  // Utility: check if a CSS selector actually matches elements on the page
+  const selectorExists = async (selector: string): Promise<boolean> => {
+    try {
+      const loc = page.locator(selector);
+      return (await loc.count()) > 0;
+    } catch (e) {
+      return false;
+    }
+  };
+
   // If mapping missing or invalid, attempt fallback heuristics to locate inputs
   const findSelector = async (candidates: string[]) => {
     for (const sel of candidates) {
-      try {
-        const loc = page.locator(sel);
-        if (await loc.count() > 0) return sel;
-      } catch (e) {
-        // ignore
+      if (await selectorExists(sel)) {
+        logger.info(`Found selector via heuristics: ${sel}`);
+        return sel;
       }
     }
     return null;
   };
 
-  const originSelector = mapping?.originInputSelector ?? await findSelector([
-    'input[name*=origin]', 'input[id*=origin]', 'input[placeholder*=From]', 'input[aria-label*=From]'
-  ]);
+  // Try stored mapping first, but validate it exists on the page
+  let originSelector: string | null = null;
+  let destSelector: string | null = null;
 
-  const destSelector = mapping?.destinationInputSelector ?? await findSelector([
-    'input[name*=dest]', 'input[id*=dest]', 'input[placeholder*=To]', 'input[aria-label*=To]'
-  ]);
+  if (mapping) {
+    if (await selectorExists(mapping.originInputSelector)) {
+      originSelector = mapping.originInputSelector;
+      logger.info(`Using stored origin selector: ${originSelector}`);
+    } else {
+      logger.warn(`Stored origin selector not found on page: ${mapping.originInputSelector}, falling back to heuristics.`);
+    }
+
+    if (await selectorExists(mapping.destinationInputSelector)) {
+      destSelector = mapping.destinationInputSelector;
+      logger.info(`Using stored destination selector: ${destSelector}`);
+    } else {
+      logger.warn(`Stored destination selector not found on page: ${mapping.destinationInputSelector}, falling back to heuristics.`);
+    }
+  }
+
+  // Fall back to heuristics if stored mapping didn't work
+  if (!originSelector) {
+    originSelector = await findSelector([
+      'input[name*=origin]', 'input[id*=origin]', 'input[placeholder*=From]', 'input[aria-label*=From]',
+      '#flightStatusForm-origin'
+    ]);
+  }
+
+  if (!destSelector) {
+    destSelector = await findSelector([
+      'input[name*=dest]', 'input[id*=dest]', 'input[placeholder*=To]', 'input[aria-label*=To]',
+      '#flightStatusForm-destination'
+    ]);
+  }
 
   if (originSelector) await pageModel.humanType(originSelector, 'DFW');
   await page.waitForTimeout(500);
   if (destSelector) await pageModel.humanType(destSelector, 'LAX');
+
+  // Capture screenshot to verify what happened
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const screenshotPath = `screenshots/agent-run-${timestamp}.png`;
+    await page.screenshot({ path: screenshotPath });
+    logger.info(`📸 Screenshot saved to: ${screenshotPath}`);
+  } catch (e) {
+    logger.warn('Failed to capture screenshot:', e);
+  }
 
   // persist mapping if obtained from LLM
   if (mapping) {

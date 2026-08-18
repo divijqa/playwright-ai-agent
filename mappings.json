@@ -4,11 +4,7 @@
     "destinationInputSelector": "input[placeholder='To']"
   },
   "www.aa.com": {
-    "originInputSelector": "input[placeholder='From']",
-    "destinationInputSelector": "input[placeholder='To']"
-  },
-  "": {
-    "originInputSelector": "input[placeholder='From']",
-    "destinationInputSelector": "input[placeholder='To']"
+    "originInputSelector": "#flights-booking-id-1-input",
+    "destinationInputSelector": "#flights-booking-id-2-input"
   }
 }
