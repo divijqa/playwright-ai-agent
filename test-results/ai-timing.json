@@ -1,0 +1,12 @@
+{
+  "mode": "ai-assisted",
+  "model": "qwen2.5-coder:7b",
+  "recordedAt": "2026-08-18T07:36:33.129Z",
+  "durationsMs": {
+    "browserInitializationMs": 135,
+    "domExtractionMs": 2,
+    "ollamaInferenceMs": 4200,
+    "playwrightExecutionMs": 3132,
+    "totalMs": 7487
+  }
+}

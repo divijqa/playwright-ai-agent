@@ -313,6 +313,32 @@ The artifact contains only the model, field decision, validated selectors, and
 timestamp. It does not store raw DOM, entered airport values, page text, or
 other private application data. Jenkins archives `test-results` for review.
 
+### Timing metrics
+
+Each agent run records phase durations in `test-results/ai-timing.json` and
+prints the same values to the console:
+
+```json
+{
+  "mode": "ai-assisted",
+  "model": "qwen2.5-coder:7b",
+  "durationsMs": {
+    "browserInitializationMs": 812,
+    "domExtractionMs": 214,
+    "ollamaInferenceMs": 2734,
+    "playwrightExecutionMs": 1491,
+    "totalMs": 5251
+  }
+}
+```
+
+The measurements make the V1 trade-off explicit: AI provides adaptive field
+intelligence, while local LLM inference adds measurable latency. Baseline runs
+with `AI_ENABLED=false` use the same artifact format and report
+`ollamaInferenceMs: 0`, allowing a direct comparison with the known POM path.
+The total includes browser setup, navigation, field mapping, Playwright actions,
+screenshot capture, and final cleanup wait.
+
 ### AI vs static locator comparison
 
 The local demo deliberately uses `From Airport` as the origin label instead of

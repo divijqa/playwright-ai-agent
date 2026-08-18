@@ -10,13 +10,45 @@ import { getPrompt } from './prompts.js';
 import { environment as env } from '../config/environment.js';
 import { FlightStatusPage, knownFlightFieldMapping } from '../pages/FlightStatusPage.js';
 
+type AgentTimingMetrics = {
+  browserInitializationMs: number;
+  domExtractionMs: number;
+  ollamaInferenceMs: number;
+  playwrightExecutionMs: number;
+  totalMs: number;
+};
+
+function elapsedMs(start: number): number {
+  return Math.round(performance.now() - start);
+}
+
+async function writeTimingArtifact(metrics: AgentTimingMetrics) {
+  const artifact = {
+    mode: env.aiEnabled ? 'ai-assisted' : 'baseline',
+    model: env.aiEnabled ? env.ollamaModel : null,
+    recordedAt: new Date().toISOString(),
+    durationsMs: metrics,
+  };
+
+  await mkdir('test-results', { recursive: true });
+  await writeFile('test-results/ai-timing.json', `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+}
+
+function logTimingMetrics(metrics: AgentTimingMetrics) {
+  logger.info('⏱️ Agent timing metrics:');
+  logger.info(`  Browser initialization: ${metrics.browserInitializationMs}ms`);
+  logger.info(`  DOM extraction:          ${metrics.domExtractionMs}ms`);
+  logger.info(`  Ollama inference:       ${metrics.ollamaInferenceMs}ms`);
+  logger.info(`  Playwright execution:   ${metrics.playwrightExecutionMs}ms`);
+  logger.info(`  Total:                  ${metrics.totalMs}ms`);
+}
+
 async function writeAiDecisionArtifact(
   decision: ValidatedFlightFieldDecision,
   selectedLocators: { origin: string; destination: string },
 ) {
   const artifact = {
     model: env.ollamaModel,
-    requiredFields: decision.requiredFields,
     optionalFields: decision.optionalFields,
     selectedLocators,
     timestamp: new Date().toISOString(),
@@ -28,11 +60,21 @@ async function writeAiDecisionArtifact(
 }
 
 export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true) {
+  const totalStart = performance.now();
+  const timing: AgentTimingMetrics = {
+    browserInitializationMs: 0,
+    domExtractionMs: 0,
+    ollamaInferenceMs: 0,
+    playwrightExecutionMs: 0,
+    totalMs: 0,
+  };
   logger.info('✈️ Initializing Autonomous Agent (modular)...');
 
+  const browserStart = performance.now();
   const browser = await chromium.launch({ headless: env.headless });
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await context.newPage();
+  timing.browserInitializationMs = elapsedMs(browserStart);
 
   // Navigate to canonical base URL
   try {
@@ -72,6 +114,7 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   } catch (_) {
     // ignore
   }
+  timing.browserInitializationMs = elapsedMs(browserStart);
 
   const cleanInputs = [
     { tag: 'input', id: 'flightStatusForm.origin', name: 'originAirport', placeholder: 'From', label: 'From Airport' },
@@ -82,6 +125,7 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   // Extract actual form inputs from the page DOM
   // Note: code inside page.evaluate() runs in browser context, so DOM APIs are available
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const domExtractionStart = performance.now();
   const extractedInputs = env.aiEnabled ? await page.evaluate(() => {
     // @ts-ignore - this code runs in browser context where document is available
     const inputs: any[] = [];
@@ -107,6 +151,7 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
     });
     return inputs;
   }) : [];
+  timing.domExtractionMs = env.aiEnabled ? elapsedMs(domExtractionStart) : 0;
 
   // Use extracted inputs if available, otherwise fall back to hardcoded schema
   const formInputs = extractedInputs.length > 0 ? extractedInputs : cleanInputs;
@@ -132,7 +177,9 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
     const prompt = getPrompt(formInputs, domain);
     logger.info('🧠 Sending prompt to local Ollama...');
     const llm = new ChatOllama({ model: env.ollamaModel, temperature: env.ollamaTemperature });
+    const inferenceStart = performance.now();
     const response = await llm.invoke(prompt);
+    timing.ollamaInferenceMs = elapsedMs(inferenceStart);
     const cleanJson = response.content.toString().replace(/```json|```/g, '').trim();
     try {
       const parsed: unknown = JSON.parse(cleanJson);
@@ -233,6 +280,7 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
 
   const pageModel = new FlightStatusPage(page, originSelector, destSelector);
 
+  const playwrightStart = performance.now();
   await pageModel.origin.fill('DFW');
   await pageModel.origin.selectSuggestion('DFW');
   await page.waitForTimeout(500);
@@ -240,6 +288,7 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   await pageModel.destination.selectSuggestion('LAX');
 
   const originValue = await pageModel.origin.value();
+    timing.playwrightExecutionMs = elapsedMs(playwrightStart);
   const destinationValue = await pageModel.destination.value();
   if (!originValue.startsWith('DFW') || !destinationValue.startsWith('LAX')) {
     throw new Error(`Flight fields were not filled correctly: ${originValue} -> ${destinationValue}`);
@@ -266,7 +315,6 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
     await browser.close();
     return runAgent(env.fallbackBaseUrl, false);
   }
-
   // Capture screenshot to verify what happened
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -287,6 +335,16 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
     }
   }
   await page.waitForTimeout(500);
+
+  timing.playwrightExecutionMs = elapsedMs(playwrightStart);
+  timing.totalMs = elapsedMs(totalStart);
+  logTimingMetrics(timing);
+  try {
+    await writeTimingArtifact(timing);
+    logger.info('⏱️ Timing artifact saved to test-results/ai-timing.json');
+  } catch (error) {
+    logger.warn('Failed to save timing artifact:', error);
+  }
 
   logger.info('🏁 Agent run complete. Closing browser.');
   await browser.close();
