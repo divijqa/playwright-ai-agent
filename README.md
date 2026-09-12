@@ -5,12 +5,14 @@ An enterprise-ready architectural sample demonstrating how to integrate **Playwr
 ## 🚀 Features & Visibility Highlights
 * **100% Free & Open-Source:** Utilizes **Ollama** locally—no paid OpenAI or Anthropic API keys required.
 * **Agentic Execution Loop:** The LLM acts as the decision engine by evaluating page options dynamically, while Playwright drives the browser.
+* **Embedded Local RAG Store:** Vector search via **LanceDB** with `nomic-embed-text` embeddings for historical selector memory and self-healing repair context.
 * **CI/CD Ready:** Configured to run headlessly inside open-source, self-hosted instances of **Jenkins**.
 
 ## 🛠️ Tech Stack
 * **Browser Automation:** Playwright (Chromium)
 * **AI Orchestration Framework:** LangChain
 * **LLM Engine:** Ollama (`qwen2.5-coder:7b`)
+* **Vector Database & RAG:** LanceDB (`@lancedb/lancedb`) with `nomic-embed-text` embeddings
 * **Language:** TypeScript / Node.js
 
 ## Architecture
@@ -18,19 +20,19 @@ Below are two architecture views (v1 and v2) and a brief explanation of the agen
 
 ### Quick pipeline (high-level)
 ```
-Ollama
+LanceDB Vector Memory
+  ↓ (few-shot context)
+Ollama (qwen2.5-coder) + nomic-embed-text
   ↓
-LangChain
+LangChain Agent & Prompts
   ↓
-AI Field Intelligence
+AI Field Intelligence & Self-Healing Repair
   ↓
 Page Object Model (POM)
   ↓
-Playwright
+Playwright (Live DOM Validation)
   ↓
-Browser
-  ↓
-Jenkins
+LanceDB Memory Recording (Success / Repair)
 ```
 
 The same agent also supports an explicit traditional Playwright baseline:
@@ -313,6 +315,45 @@ The artifact contains only the model, field decision, validated selectors, and
 timestamp. It does not store raw DOM, entered airport values, page text, or
 other private application data. Jenkins archives `test-results` for review.
 
+### 🧠 Local RAG Vector Store & Self-Healing Memory
+
+The agent incorporates an embedded **Retrieval-Augmented Generation (RAG)** pipeline powered by **LanceDB** (`@lancedb/lancedb`) and Ollama (`nomic-embed-text` embeddings).
+
+```text
+       Live Page DOM Inputs
+                 ↓
+     ┌───────────────────────┐
+     │ LanceDB Vector Search │ ◄── search_query: fieldSignature()
+     └───────────┬───────────┘
+                 ↓
+      Few-Shot RAG Candidates
+                 ↓
+      Ollama (qwen2.5-coder)
+                 ↓
+     Zod Schema + Live DOM Check
+                 ├────────── Valid (count === 1) ──► Record Success → locator_memory
+                 │
+           Validation Failed
+                 ↓
+    Self-Healing Repair Loop ◄── RAG failure_memory context
+                 ↓
+       Record Fix Resolution ──────────────────────► failure_memory
+```
+
+#### Key Architecture Components:
+1. **Embedded LanceDB Storage (`.rag/lancedb`)**:
+   - `locator_memory`: Persists validated `(fieldSignature -> selector)` entries for historical few-shot context across runs.
+   - `failure_memory`: Persists past locator validation errors, attempted selectors, and resolved `fixSelector` values for self-healing.
+2. **Local Embedding Engine (`src/rag/embeddings.ts`)**:
+   - Calls local Ollama `/api/embed` with `nomic-embed-text`.
+   - Uses task-specific prefixes (`search_document:` for storing and `search_query:` for querying) to maximize vector retrieval quality.
+3. **Retrieval & Few-Shot Prompting (`src/rag/retriever.ts`)**:
+   - `getLocatorFewShotContext()` retrieves historical selector matches for form fields before LLM inference, injecting guidance directly into the prompt.
+4. **Live DOM Validation & Repair Loop (`src/agent/validateLocators.ts`)**:
+   - `validateDecisionLocators()` checks that proposed CSS selectors match **exactly 1 element** on the live Playwright DOM.
+   - If a selector fails (matches 0 or multiple elements), `getValidatedDecisionWithRepair()` retries up to `maxAttempts` with failure feedback and `failure_memory` context.
+   - On repair resolution, `recordFailureResolution()` updates LanceDB so future runs automatically benefit from the fix.
+
 ### Timing metrics
 
 Each agent run records phase durations in `test-results/ai-timing.json` and
@@ -411,9 +452,10 @@ In v2 the "Validation" and some "Candidate locator" heuristics can run inside th
 ## 💻 Local Setup & Execution
 
 ### 1. Download Ollama
-Install [Ollama](https://ollama.com) on your host machine and pull the optimized coding model via terminal:
+Install [Ollama](https://ollama.com) on your host machine and pull the required LLM and embedding models via terminal:
 ```bash
-ollama run qwen2.5-coder:7b
+ollama pull qwen2.5-coder:7b
+ollama pull nomic-embed-text
 ```
 
 ### 2. Install Dependencies
@@ -585,8 +627,16 @@ playwright-ai-agent/
 ├── src/
 │   ├── agent/
 │   │   ├── aiAgent.ts
+│   │   ├── mappingStore.ts
 │   │   ├── prompts.ts
-│   │   └── schemas.ts
+│   │   ├── schemas.ts
+│   │   └── validateLocators.ts
+│   │
+│   ├── rag/
+│   │   ├── embeddings.ts
+│   │   ├── ingest.ts
+│   │   ├── retriever.ts
+│   │   └── store.ts
 │   │
 │   ├── pages/
 │   │   ├── BasePage.ts
