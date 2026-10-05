@@ -9,7 +9,7 @@ pipeline {
         CI = 'true'
         HEADLESS = 'true'
         OLLAMA_MODEL = 'qwen2.5-coder:7b'
-        # Use TEST_SERVER_PORT to avoid Jenkins default port conflicts
+        // Use TEST_SERVER_PORT to avoid Jenkins default port conflicts
         TEST_SERVER_PORT = '8081'
     }
 
