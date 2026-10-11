@@ -1,7 +1,7 @@
 /// <reference types="node" />
 
 import process from 'process';
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
 // Respect BASE_URL and optionally start a simple static server for local test pages.
 const baseUrlFromEnv = process.env.BASE_URL;
@@ -15,7 +15,7 @@ const webServer = shouldStartServer
     }
   : undefined;
 
-const baseConfig = {
+const baseConfig: PlaywrightTestConfig = {
   testDir: './tests',
   // flightStatus.spec.ts is a standalone agent runner; it is invoked by the shell helper.
   testIgnore: ['**/flightStatus.spec.ts'],
@@ -32,16 +32,7 @@ const baseConfig = {
   timeout: 60_000,
   expect: { timeout: 5_000 },
 
-  reporter: [
-    ['list'],
-    [
-      'html',
-      {
-        outputFolder: 'playwright-report',
-        open: 'never',
-      },
-    ],
-  ],
+  reporter: [['html', { open: 'never' }], ['junit', { outputFile: 'results.xml' }]],
 
   outputDir: 'test-results',
 

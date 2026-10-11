@@ -5,15 +5,14 @@ import { logger } from '../utils/logger.js';
 import type { FlightFieldMapping } from '../types/flight.js';
 import { flightFieldDecisionSchema, type ValidatedFlightFieldDecision } from './schemas.js';
 import { canonicalizeUrl } from '../utils/url.js';
-import { loadMapping, saveMapping } from './mappingStore.js';
-import { getPrompt } from './prompts.js';
+import { loadMapping } from './mappingStore.js';
 import { environment as env } from '../config/environment.js';
 import { FlightStatusPage, knownFlightFieldMapping } from '../pages/FlightStatusPage.js';
+import { getValidatedDecisionWithRepair } from './validateLocators.js';
 
 // RAG Retriever Imports
 import {
   getLocatorFewShotContext,
-  getFailureFewShotContext,
   recordLocatorSuccess,
   recordFailureResolution,
 } from '../rag/retriever.js';
@@ -135,11 +134,8 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
   const domExtractionStart = performance.now();
   const extractedInputs = env.aiEnabled
     ? await page.evaluate(() => {
-        // @ts-ignore
         const inputs: any[] = [];
-        // @ts-ignore
         const allInputs = document.querySelectorAll('input[type="text"], input:not([type])');
-        // @ts-ignore
         allInputs.forEach((el: any) => {
           const input = el as any;
           inputs.push({
@@ -151,7 +147,6 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
             ariaLabel: input.getAttribute('aria-label') || '',
             ariaPlaceholder: input.getAttribute('aria-placeholder') || '',
             label: (() => {
-              // @ts-ignore
               const label = input.id ? document.querySelector(`label[for="${input.id}"]`) : null;
               return label?.textContent?.trim() || input.getAttribute('aria-label') || '';
             })(),
@@ -195,94 +190,53 @@ export async function runAgent(targetBaseUrl = env.baseUrl, allowFallback = true
       );
       ragContext = ragSnippets.filter(Boolean).join('\n');
       if (ragContext) {
-        logger.info('📚 Retried historical locator context from RAG vector store');
+        logger.info('📚 Retrieved historical locator context from RAG vector store');
       }
     } catch (err) {
       logger.warn('⚠️ RAG context retrieval warning:', err);
     }
     timing.ragRetrievalMs = elapsedMs(ragStart);
 
-    // Pass `ragContext` into `getPrompt`
-    const prompt = getPrompt(formInputs, domain, ragContext);
-    logger.info('🧠 Sending prompt + RAG context to local Ollama...');
-
+    // Instantiate ChatOllama for repair loop queries
     const llm = new ChatOllama({ model: env.ollamaModel, temperature: env.ollamaTemperature });
-    const inferenceStart = performance.now();
-    const response = await llm.invoke(prompt);
-    timing.ollamaInferenceMs = elapsedMs(inferenceStart);
 
-    const cleanJson = response.content.toString().replace(/```json|```/g, '').trim();
+    const inferenceStart = performance.now();
     try {
-      const parsed: unknown = JSON.parse(cleanJson);
-      const validation = flightFieldDecisionSchema.safeParse(parsed);
-      if (!validation.success) {
-        throw new Error(validation.error.issues.map((issue) => issue.message).join('; '));
-      }
-      decision = validation.data;
+      decision = await getValidatedDecisionWithRepair({
+        page,
+        cleanInputs: formInputs,
+        domain,
+        ragContext,
+        callLLM: async (prompt: string) => {
+          const response = await llm.invoke(prompt);
+          return response.content.toString();
+        },
+        maxAttempts: 3,
+      });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
 
-      // 🔍 RAG STEP 2: Record Failure Context on LLM Parse Exception
+      // Record Failure Context if LLM or repair loop failed
       await recordFailureResolution({
-        failure: { errorMessage: reason, attemptedSelector: 'LLM_PARSE_FAILURE', domSummary: JSON.stringify(formInputs) },
+        failure: { errorMessage: reason, attemptedSelector: 'LLM_REPAIR_FAILURE', domSummary: JSON.stringify(formInputs) },
         fixSelector: 'FALLBACK_HEURISTIC',
         domain,
         url: page.url(),
       });
 
-      throw new Error(`Invalid AI field decision; refusing to interact with page: ${reason}`);
+      throw new Error(`Invalid AI field decision after repairs; refusing to interact with page: ${reason}`);
     }
+    timing.ollamaInferenceMs = elapsedMs(inferenceStart);
 
     mapping = decision;
-    logger.info(`✅ Zod validated AI decision: required=${decision.requiredFields.join(', ')}`);
+    logger.info(`✅ Zod validated & live verified AI decision: required=${decision.requiredFields.join(', ')}`);
   } else {
     mapping = knownFlightFieldMapping;
     logger.info('🚫 AI disabled; using known FlightStatusPage mapping.');
   }
 
-  // Utility: check selector existence
-  const selectorExists = async (selector: string): Promise<boolean> => {
-    try {
-      const loc = page.locator(selector);
-      return (await loc.count()) > 0;
-    } catch {
-      return false;
-    }
-  };
-
-  const findSelector = async (candidates: string[]) => {
-    for (const sel of candidates) {
-      if (await selectorExists(sel)) {
-        logger.info(`Found selector via heuristics: ${sel}`);
-        return sel;
-      }
-    }
-    return null;
-  };
-
-  let originSelector: string | null = null;
-  let destSelector: string | null = null;
-
-  if (mapping) {
-    if (await selectorExists(mapping.originInputSelector)) {
-      originSelector = mapping.originInputSelector;
-    }
-    if (await selectorExists(mapping.destinationInputSelector)) {
-      destSelector = mapping.destinationInputSelector;
-    }
-  }
-
-  // Fallback heuristic lookups
-  if (!originSelector) {
-    originSelector = await findSelector([
-      'input[name*=origin]', 'input[id*=origin]', 'input[placeholder*=From]', 'input[aria-label*=From]', '#flightStatusForm-origin',
-    ]);
-  }
-  if (!destSelector) {
-    destSelector = await findSelector([
-      'input[name*=dest]', 'input[id*=dest]', 'input[placeholder*=To]', 'input[aria-label*=To]', '#flightStatusForm-destination',
-    ]);
-  }
+  const originSelector = mapping?.originInputSelector;
+  const destSelector = mapping?.destinationInputSelector;
 
   if (!originSelector || !destSelector) {
     throw new Error('Unable to identify both origin and destination inputs.');
