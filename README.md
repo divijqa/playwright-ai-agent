@@ -539,6 +539,7 @@ This command is expected to exit with code `1`. It generates:
 - Video: `test-results/**/video.webm`
 - Trace: `test-results/**/trace.zip`
 - HTML report: `playwright-report/index.html`
+- Attached diagnostic log: `sample-diagnostic-logs.txt` in the failed test details
 
 Open the trace locally with:
 
